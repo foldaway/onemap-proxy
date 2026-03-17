@@ -1,18 +1,20 @@
 /**
- * Welcome to Cloudflare Workers! This is your first worker.
+ * OneMap API proxy with KV caching.
  *
- * - Run `npm run dev` in your terminal to start a development server
- * - Open a browser tab at http://localhost:8787/ to see your worker in action
- * - Run `npm run deploy` to publish your worker
+ * Proxies requests to Singapore's OneMap API and caches responses in KV.
+ * Requires ONEMAP_EMAIL + ONEMAP_PASSWORD (or ONEMAP_TOKEN) as secrets.
  *
- * Bind resources to your worker in `wrangler.jsonc`. After adding bindings, a type definition for the
- * `Env` object can be regenerated with `npm run cf-typegen`.
- *
- * Learn more at https://developers.cloudflare.com/workers/
+ * Usage:
+ *   GET /revgeocode?location=lat,lon
+ *   GET /revgeocodexy?location=x,y
  */
 
+import { createHono } from "./hono";
+
+const hono = createHono();
+
+export { OnemapCacheDurableObject } from "./durable-object";
+
 export default {
-	async fetch(request, env, ctx): Promise<Response> {
-		return new Response('Hello World!');
-	},
+  fetch: hono.fetch,
 } satisfies ExportedHandler<Env>;
