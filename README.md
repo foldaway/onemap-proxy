@@ -2,6 +2,11 @@
 
 A Cloudflare Worker that proxies Singapore's [OneMap API](https://www.onemap.gov.sg/apidocs/) search and routing endpoints. It handles OneMap authentication automatically, caches successful upstream responses in a SQLite-backed Durable Object, and exposes Bearer-token-protected proxy endpoints with a public OpenAPI reference UI.
 
+> [!IMPORTANT]
+> This repository supports Foldaway's internal use of OneMap data. It is not intended to provide a public hosted API, and the deployed Worker should not be treated as a shared third-party service.
+>
+> External users who need similar functionality are encouraged to fork this repository and deploy their own Cloudflare Worker with their own Cloudflare and OneMap credentials.
+
 ## Features
 
 - Proxies OneMap search and routing endpoints
