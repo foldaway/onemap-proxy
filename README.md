@@ -1,42 +1,45 @@
 # onemap-proxy
 
-A Cloudflare Worker that proxies Singapore's [OneMap API](https://www.onemap.gov.sg/apidocs/) with KV-backed caching. Handles OneMap authentication automatically and exposes a Bearer-token-protected API with an OpenAPI reference UI.
+A Cloudflare Worker that proxies Singapore's [OneMap API](https://www.onemap.gov.sg/apidocs/) search and routing endpoints. It handles OneMap authentication automatically, caches successful upstream responses in a SQLite-backed Durable Object, and exposes Bearer-token-protected proxy endpoints with a public OpenAPI reference UI.
 
 ## Features
 
 - Proxies OneMap search and routing endpoints
-- Caches search API responses in Cloudflare KV for 1 year, routing for 3 months
-- Automatically fetches and caches OneMap access tokens (~3 days)
-- Bearer token authentication for all proxied endpoints
-- OpenAPI 3.0 spec auto-generated at `/openapi.json`
-- Interactive API docs (Scalar) served at `/`
+- Caches successful search responses for 1 year and routing responses for 90 days
+- Automatically fetches and caches OneMap access tokens for 3 days
+- Stores cached data in the `OnemapCacheDurableObject` Durable Object
+- Requires Bearer token authentication for proxied endpoints
+- Generates an OpenAPI 3.0 spec at `/openapi.json`
+- Serves an interactive Scalar API reference at `/`
 
 ## Endpoints
 
-| Method | Path | Description |
-|--------|------|-------------|
-| `GET` | `/api/common/elastic/search` | Search for addresses and places |
-| `GET` | `/api/public/routingsvc/route` | Get walking, driving, cycling, or public transport routes |
-| `GET` | `/openapi.json` | OpenAPI 3.0 spec |
-| `GET` | `/` | Interactive API reference (no auth required) |
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| `GET` | `/api/common/elastic/search` | Required | Search for addresses and places |
+| `GET` | `/api/public/routingsvc/route` | Required | Get walking, driving, cycling, or public transport routes |
+| `GET` | `/openapi.json` | Not required | OpenAPI 3.0 spec |
+| `GET` | `/` | Not required | Interactive API reference |
 
 ### Search
 
-```
+```http
 GET /api/common/elastic/search?searchVal=<keywords>&returnGeom=Y&getAddrDetails=Y&pageNum=1
+Authorization: Bearer <token>
 ```
 
 | Parameter | Required | Description |
 |-----------|----------|-------------|
 | `searchVal` | Yes | Keywords to search for |
-| `returnGeom` | Yes | `Y` or `N` — include geometry in results |
-| `getAddrDetails` | Yes | `Y` or `N` — include address details |
+| `returnGeom` | Yes | `Y` or `N`; include geometry in results |
+| `getAddrDetails` | Yes | `Y` or `N`; include address details |
 | `pageNum` | No | Page number for paginated results |
 
 ### Routing
 
-```
+```http
 GET /api/public/routingsvc/route?start=<lat,lon>&end=<lat,lon>&routeType=<type>
+Authorization: Bearer <token>
 ```
 
 | Parameter | Required | Description |
@@ -45,17 +48,17 @@ GET /api/public/routingsvc/route?start=<lat,lon>&end=<lat,lon>&routeType=<type>
 | `end` | Yes | End point as `latitude,longitude` |
 | `routeType` | Yes | `walk`, `drive`, `cycle`, or `pt` |
 | `date` | Required for `pt` | Date in `MM-DD-YYYY` format |
-| `time` | Required for `pt` | Time in `HH:MM:SS` (24-hour) |
+| `time` | Required for `pt` | Time in `HH:MM:SS` 24-hour format |
 | `mode` | Required for `pt` | `transit`, `bus`, or `rail` |
 | `maxWalkDistance` | No | Maximum walking distance in metres |
-| `numItineraries` | No | Number of results to return (1–3) |
+| `numItineraries` | No | Number of results to return, from 1 to 3 |
 
 ## Development
 
 ### Prerequisites
 
 - [Node.js](https://nodejs.org/)
-- A [Cloudflare account](https://dash.cloudflare.com/) with Workers and KV access
+- A [Cloudflare account](https://dash.cloudflare.com/) with Workers and Durable Objects access
 - A [OneMap account](https://www.onemap.gov.sg/apidocs/) with API credentials
 
 ### Setup
@@ -66,15 +69,13 @@ GET /api/public/routingsvc/route?start=<lat,lon>&end=<lat,lon>&routeType=<type>
    npm install
    ```
 
-2. Create a KV namespace:
+2. Create a local secrets file:
 
    ```sh
-   npx wrangler kv namespace create ONEMAP_CACHE
+   cp .dev.vars.example .dev.vars
    ```
 
-   Update the `id` in `wrangler.jsonc` with the ID from the output.
-
-3. Create a `.dev.vars` file with your secrets:
+3. Fill in `.dev.vars`:
 
    ```sh
    ONEMAP_EMAIL=your@email.com
@@ -82,7 +83,7 @@ GET /api/public/routingsvc/route?start=<lat,lon>&end=<lat,lon>&routeType=<type>
    API_TOKENS=your-api-token
    ```
 
-   `API_TOKENS` is a comma-separated list of Bearer tokens clients must supply.
+   `API_TOKENS` is a comma-separated list of Bearer tokens that clients may use.
 
 4. Start the local dev server:
 
@@ -90,18 +91,29 @@ GET /api/public/routingsvc/route?start=<lat,lon>&end=<lat,lon>&routeType=<type>
    npm run dev
    ```
 
+The Durable Object binding and migration are already configured in `wrangler.jsonc`; no KV namespace setup is required.
+
 ### Scripts
 
 | Command | Description |
 |---------|-------------|
-| `npm run dev` | Start local development server |
-| `npm run deploy` | Deploy to Cloudflare |
-| `npm test` | Run tests |
-| `npm run cf-typegen` | Regenerate TypeScript types from `wrangler.jsonc` bindings |
+| `npm run dev` | Start the local Wrangler development server |
+| `npm start` | Alias for `npm run dev` |
+| `npm run deploy` | Deploy to Cloudflare Workers |
+| `npm test` | Run the Vitest Worker test suite |
+| `npm run cf-typegen` | Regenerate `worker-configuration.d.ts` from `wrangler.jsonc` |
+
+Run `npm run cf-typegen` after changing Worker bindings or compatibility settings in `wrangler.jsonc`.
 
 ## Deployment
 
-1. Set production secrets:
+1. Log in to Cloudflare if needed:
+
+   ```sh
+   npx wrangler login
+   ```
+
+2. Set production secrets:
 
    ```sh
    npx wrangler secret put ONEMAP_EMAIL
@@ -109,27 +121,32 @@ GET /api/public/routingsvc/route?start=<lat,lon>&end=<lat,lon>&routeType=<type>
    npx wrangler secret put API_TOKENS
    ```
 
-2. Deploy:
+3. Deploy:
 
    ```sh
    npm run deploy
    ```
 
+The first deployment applies the Durable Object migration in `wrangler.jsonc` for `OnemapCacheDurableObject`.
+
 ## Authentication
 
-All proxied endpoints require a `Bearer` token in the `Authorization` header:
+All proxied endpoints require a Bearer token in the `Authorization` header:
 
-```
+```http
 Authorization: Bearer <token>
 ```
 
-Tokens are configured via the `API_TOKENS` secret (comma-separated for multiple tokens).
+Tokens are configured through the `API_TOKENS` secret. Use comma-separated values to allow multiple client tokens.
 
 ## Caching
 
-| Data | TTL |
-|------|-----|
-| API responses (search, routing) | 7 days |
-| OneMap access token | 3 days |
+| Data | TTL | Cache key source |
+|------|-----|------------------|
+| Search responses | 1 year | Search query parameters |
+| Routing responses | 90 days | Routing query parameters |
+| OneMap access token | 3 days | Shared `token` key |
 
-Caching is handled by Cloudflare KV via the `ONEMAP_CACHE` binding.
+Caching is handled by the `ONEMAP_CACHE_DO` Durable Object binding. Cached rows are stored in the Durable Object's SQLite storage and are ignored after their `expires_at` timestamp.
+
+Only successful OneMap responses without an `error` field are cached.
