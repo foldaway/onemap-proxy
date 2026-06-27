@@ -1,4 +1,4 @@
-# jalan-onemap-proxy
+# onemap-proxy
 
 A Cloudflare Worker that proxies Singapore's [OneMap API](https://www.onemap.gov.sg/apidocs/) with KV-backed caching. Handles OneMap authentication automatically and exposes a Bearer-token-protected API with an OpenAPI reference UI.
 
