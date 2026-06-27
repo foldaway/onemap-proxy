@@ -8,6 +8,11 @@ import { openAPIRouteHandler } from "hono-openapi";
 import { routingRoute } from "./routes/routing";
 import { searchRoute } from "./routes/search";
 
+const API_TITLE = "Foldaway OneMap Proxy";
+const API_DESCRIPTION =
+  "Bearer-token-protected proxy for OneMap search and routing endpoints, with Foldaway-managed authentication and response caching.";
+const API_VERSION = "1.0.0";
+
 /**
  * Create a Hono instance with the routes and middleware.
  * @returns A Hono instance.
@@ -49,8 +54,9 @@ export function createHono() {
     openAPIRouteHandler(hono, {
       documentation: {
         info: {
-          title: "OneMap API",
-          version: "1.0.0",
+          title: API_TITLE,
+          description: API_DESCRIPTION,
+          version: API_VERSION,
         },
         components: {
           securitySchemes: {
@@ -68,7 +74,7 @@ export function createHono() {
   hono.get(
     "/",
     Scalar({
-      title: "OneMap API",
+      title: API_TITLE,
       url: "/openapi.json",
     }),
   );
