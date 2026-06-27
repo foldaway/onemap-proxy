@@ -2,6 +2,11 @@
 
 STOP. Your knowledge of Cloudflare Workers APIs and limits may be outdated. Always retrieve current documentation before any Workers, KV, R2, D1, Durable Objects, Queues, Vectorize, AI, or Agents SDK task.
 
+## Commits
+
+- Use Conventional Commit style for commit messages.
+- Include `Co-Authored-By: Codex <codex@openai.com>` for commits authored with agent assistance.
+
 ## Docs
 
 - https://developers.cloudflare.com/workers/
