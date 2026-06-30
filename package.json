@@ -15,7 +15,7 @@
     "@types/node": "^25.5.0",
     "typescript": "^5.5.2",
     "vitest": "~3.2.0",
-    "wrangler": "^4.73.0"
+    "wrangler": "^4.103.0"
   },
   "dependencies": {
     "@hono/standard-validator": "^0.2.2",
